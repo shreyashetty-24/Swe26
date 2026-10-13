@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   if (currentUser) {
     return <Navigate to="/projects" replace />;
@@ -57,14 +58,24 @@ export default function LoginPage() {
           <label className="field">
             <span>Password</span>
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               required
             />
+            <button
+              type="button"
+              className = "link-button"
+              style = {{ alignSelf: 'flex-end'}}
+              aria-pressed = {showPassword}
+              onClick = {() => setShowPassword((visible) => !visible)}
+            >
+              {showPassword ? 'Hide password' : 'Show password'}
+            </button>
           </label>
 
+          
           {error && <p className="error-text">{error}</p>}
 
           <button type="submit" className="btn btn-primary btn-block">
