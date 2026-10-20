@@ -26,5 +26,6 @@ export const initialProjects = [
   },
 ];
 
-// Populated by signup. Shape: { id, username, password }
-export const initialUsers = [];
+// Note: user accounts are no longer mocked/in-memory here. They're created
+// via the backend's /api/signup endpoint and stored (encrypted) in
+// backend/data/users.txt. See backend/README.md.

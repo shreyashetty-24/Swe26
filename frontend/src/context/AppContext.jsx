@@ -1,11 +1,11 @@
 import { createContext, useContext, useReducer } from 'react';
-import { initialHardwareSets, initialProjects, initialUsers } from '../data/mockData';
+import { initialHardwareSets, initialProjects } from '../data/mockData';
+import { loginRequest, signupRequest } from '../api/authApi';
 
 const AppContext = createContext(null);
 
 const initialState = {
   currentUser: null,
-  users: initialUsers,
   projects: initialProjects,
   hardwareSets: initialHardwareSets,
 };
@@ -24,11 +24,6 @@ function nextProjectId(projects) {
 
 function reducer(state, action) {
   switch (action.type) {
-    case 'SIGNUP': {
-      const newUser = { id: makeId('u'), username: action.username, password: action.password };
-      return { ...state, users: [...state.users, newUser], currentUser: newUser };
-    }
-
     case 'LOGIN': {
       return { ...state, currentUser: action.user };
     }
@@ -103,23 +98,30 @@ function reducer(state, action) {
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  function signup(username, password) {
+  // Signup/login both call the very basic backend API (see ../../backend)
+  // instead of keeping credentials in memory. The backend persists users
+  // to a local encrypted text file.
+  async function signup(username, password) {
     if (!username.trim() || !password.trim()) {
       return { ok: false, error: 'Username and password are required.' };
     }
-    if (state.users.some((u) => u.username === username)) {
-      return { ok: false, error: 'That username is already taken.' };
+    const result = await signupRequest(username, password);
+    if (!result.ok) {
+      return result;
     }
-    dispatch({ type: 'SIGNUP', username, password });
+    dispatch({ type: 'LOGIN', user: result.user });
     return { ok: true };
   }
 
-  function login(username, password) {
-    const user = state.users.find((u) => u.username === username && u.password === password);
-    if (!user) {
-      return { ok: false, error: 'Invalid username or password.' };
+  async function login(username, password) {
+    if (!username.trim() || !password.trim()) {
+      return { ok: false, error: 'Username and password are required.' };
     }
-    dispatch({ type: 'LOGIN', user });
+    const result = await loginRequest(username, password);
+    if (!result.ok) {
+      return result;
+    }
+    dispatch({ type: 'LOGIN', user: result.user });
     return { ok: true };
   }
 
@@ -184,7 +186,6 @@ export function AppProvider({ children }) {
 
   const value = {
     currentUser: state.currentUser,
-    users: state.users,
     projects: state.projects,
     hardwareSets: state.hardwareSets,
     signup,

@@ -11,16 +11,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (currentUser) {
     return <Navigate to="/projects" replace />;
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    setIsSubmitting(true);
 
-    const result = mode === 'login' ? login(username, password) : signup(username, password);
+    const result = mode === 'login' ? await login(username, password) : await signup(username, password);
+
+    setIsSubmitting(false);
 
     if (!result.ok) {
       setError(result.error);
@@ -78,8 +82,8 @@ export default function LoginPage() {
           
           {error && <p className="error-text">{error}</p>}
 
-          <button type="submit" className="btn btn-primary btn-block">
-            {mode === 'login' ? 'Log in' : 'Sign up'}
+          <button type="submit" className="btn btn-primary btn-block" disabled={isSubmitting}>
+            {isSubmitting ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Sign up'}
           </button>
         </form>
 
