@@ -1,26 +1,22 @@
-import { createContext, useContext, useReducer } from 'react';
-import { initialHardwareSets, initialProjects } from '../data/mockData';
+import { createContext, useContext, useEffect, useReducer } from 'react';
 import { loginRequest, signupRequest } from '../api/authApi';
+import {
+  checkInHardwareRequest,
+  checkOutHardwareRequest,
+  createProjectRequest,
+  fetchHardware,
+  fetchProjects,
+  joinProjectRequest,
+  leaveProjectRequest,
+} from '../api/appApi';
 
 const AppContext = createContext(null);
 
 const initialState = {
   currentUser: null,
-  projects: initialProjects,
-  hardwareSets: initialHardwareSets,
+  projects: [],
+  hardwareSets: [],
 };
-
-function makeId(prefix) {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-}
-
-function nextProjectId(projects) {
-  const nums = projects.map((p) => Number(p.id.replace('PRJ-', ''))).filter((n) => !Number.isNaN(n));
-  return `PRJ-${Math.max(1000, ...nums) + 1}`;
-}
 
 function reducer(state, action) {
   switch (action.type) {
@@ -32,62 +28,12 @@ function reducer(state, action) {
       return { ...state, currentUser: null };
     }
 
-    case 'CREATE_PROJECT': {
-      const newProject = {
-        id: nextProjectId(state.projects),
-        name: action.name,
-        startDate: action.startDate,
-        endDate: action.endDate,
-        memberIds: [action.userId],
-        checkouts: [],
-      };
-      return { ...state, projects: [...state.projects, newProject] };
+    case 'SET_PROJECTS': {
+      return { ...state, projects: action.projects };
     }
 
-    case 'JOIN_PROJECT': {
-      return {
-        ...state,
-        projects: state.projects.map((p) => {
-          if (p.id !== action.projectId) return p;
-          if (p.memberIds.includes(action.userId)) return p;
-          return { ...p, memberIds: [...p.memberIds, action.userId] };
-        }),
-      };
-    }
-
-    case 'CHECK_OUT_HARDWARE': {
-      const checkoutRecord = {
-        id: makeId('c'),
-        hardwareId: action.hardwareId,
-        quantity: action.quantity,
-        checkedOutAt: new Date().toISOString(),
-      };
-      return {
-        ...state,
-        hardwareSets: state.hardwareSets.map((h) =>
-          h.id === action.hardwareId ? { ...h, available: h.available - action.quantity } : h
-        ),
-        projects: state.projects.map((p) =>
-          p.id === action.projectId ? { ...p, checkouts: [...p.checkouts, checkoutRecord] } : p
-        ),
-      };
-    }
-
-    case 'CHECK_IN_HARDWARE': {
-      const project = state.projects.find((p) => p.id === action.projectId);
-      const checkout = project?.checkouts.find((c) => c.id === action.checkoutId);
-      if (!checkout) return state;
-      return {
-        ...state,
-        hardwareSets: state.hardwareSets.map((h) =>
-          h.id === checkout.hardwareId ? { ...h, available: h.available + checkout.quantity } : h
-        ),
-        projects: state.projects.map((p) =>
-          p.id === action.projectId
-            ? { ...p, checkouts: p.checkouts.filter((c) => c.id !== action.checkoutId) }
-            : p
-        ),
-      };
+    case 'SET_HARDWARE': {
+      return { ...state, hardwareSets: action.hardwareSets };
     }
 
     default:
@@ -97,6 +43,28 @@ function reducer(state, action) {
 
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+
+  async function refreshProjects() {
+    const result = await fetchProjects();
+    if (result.ok) {
+      dispatch({ type: 'SET_PROJECTS', projects: result.projects });
+    }
+  }
+
+  async function refreshHardware() {
+    const result = await fetchHardware();
+    if (result.ok) {
+      dispatch({ type: 'SET_HARDWARE', hardwareSets: result.hardwareSets });
+    }
+  }
+
+  // Projects & hardware sets now live on the backend (simple local JSON
+  // files -- see backend/project_store.py and backend/hardware_store.py)
+  // instead of in-memory mock data, so load them once up front.
+  useEffect(() => {
+    refreshProjects();
+    refreshHardware();
+  }, []);
 
   // Signup/login both call the very basic backend API (see ../../backend)
   // instead of keeping credentials in memory. The backend persists users
@@ -129,59 +97,63 @@ export function AppProvider({ children }) {
     dispatch({ type: 'LOGOUT' });
   }
 
-  function createProject(name, startDate, endDate) {
+  async function createProject(name, startDate, endDate) {
     if (!name.trim() || !startDate || !endDate) {
       return { ok: false, error: 'Name, start date, and end date are all required.' };
     }
     if (endDate < startDate) {
       return { ok: false, error: 'End date cannot be before the start date.' };
     }
-    dispatch({ type: 'CREATE_PROJECT', name, startDate, endDate, userId: state.currentUser.id });
-    return { ok: true };
+    const result = await createProjectRequest(name, startDate, endDate, state.currentUser.id);
+    if (!result.ok) {
+      return result;
+    }
+    await refreshProjects();
+    return { ok: true, project: result.project };
   }
 
   // Projects can only be joined by entering the exact project ID (no browse-and-join button).
-  function joinProject(rawId) {
+  async function joinProject(rawId) {
     const projectId = rawId.trim().toUpperCase();
     if (!projectId) {
       return { ok: false, error: 'Please enter a project ID.' };
     }
-    const project = state.projects.find((p) => p.id.toUpperCase() === projectId);
-    if (!project) {
-      return { ok: false, error: 'No project found with that ID.' };
+    const result = await joinProjectRequest(projectId, state.currentUser.id);
+    if (!result.ok) {
+      return result;
     }
-    if (project.memberIds.includes(state.currentUser.id)) {
-      return { ok: false, error: `You are already a member of ${project.name}.` };
-    }
-    dispatch({ type: 'JOIN_PROJECT', projectId: project.id, userId: state.currentUser.id });
-    return { ok: true, project };
+    await refreshProjects();
+    return { ok: true, project: result.project };
   }
 
-  function checkOutHardware(projectId, hardwareId, quantity) {
-    const hw = state.hardwareSets.find((h) => h.id === hardwareId);
-    if (!hw) {
-      return { ok: false, error: 'Selected hardware set could not be found.' };
+  async function leaveProject(projectId) {
+    const result = await leaveProjectRequest(projectId, state.currentUser.id);
+    if (!result.ok) {
+      return result;
     }
+    await refreshProjects();
+    return { ok: true, project: result.project };
+  }
+
+  async function checkOutHardware(projectId, hardwareId, quantity) {
     if (!quantity || quantity <= 0) {
       return { ok: false, error: 'Quantity must be at least 1.' };
     }
-    if (hw.available < quantity) {
-      return {
-        ok: false,
-        error: `Not enough available. Only ${hw.available} unit${hw.available === 1 ? '' : 's'} of ${hw.name} left in the global pool.`,
-      };
+    const result = await checkOutHardwareRequest(projectId, hardwareId, quantity);
+    if (!result.ok) {
+      return result;
     }
-    dispatch({
-      type: 'CHECK_OUT_HARDWARE',
-      projectId,
-      hardwareId,
-      quantity,
-    });
+    await Promise.all([refreshProjects(), refreshHardware()]);
     return { ok: true };
   }
 
-  function checkInHardware(projectId, checkoutId) {
-    dispatch({ type: 'CHECK_IN_HARDWARE', projectId, checkoutId });
+  async function checkInHardware(projectId, checkoutId) {
+    const result = await checkInHardwareRequest(projectId, checkoutId);
+    if (!result.ok) {
+      return result;
+    }
+    await Promise.all([refreshProjects(), refreshHardware()]);
+    return { ok: true };
   }
 
   const value = {
@@ -193,6 +165,7 @@ export function AppProvider({ children }) {
     logout,
     createProject,
     joinProject,
+    leaveProject,
     checkOutHardware,
     checkInHardware,
   };

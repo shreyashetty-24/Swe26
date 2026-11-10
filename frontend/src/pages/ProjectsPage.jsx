@@ -13,16 +13,20 @@ export default function ProjectsPage() {
   const [joinId, setJoinId] = useState('');
   const [joinError, setJoinError] = useState('');
   const [joinMessage, setJoinMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Students only see projects they belong to; others must be joined by project ID.
   const myProjects = projects.filter((p) => p.memberIds.includes(currentUser.id));
 
-  function handleJoin(e) {
+  async function handleJoin(e) {
     e.preventDefault();
     setJoinError('');
     setJoinMessage('');
+    setIsSubmitting(true);
 
-    const result = joinProject(joinId);
+    const result = await joinProject(joinId);
+    setIsSubmitting(false);
+
     if (!result.ok) {
       setJoinError(result.error);
       return;
@@ -32,11 +36,14 @@ export default function ProjectsPage() {
     setJoinId('');
   }
 
-  function handleCreate(e) {
+  async function handleCreate(e) {
     e.preventDefault();
     setError('');
+    setIsSubmitting(true);
 
-    const result = createProject(name, startDate, endDate);
+    const result = await createProject(name, startDate, endDate);
+    setIsSubmitting(false);
+
     if (!result.ok) {
       setError(result.error);
       return;
@@ -93,7 +100,7 @@ export default function ProjectsPage() {
             </label>
           </div>
           {error && <p className="error-text">{error}</p>}
-          <button type="submit" className="btn btn-primary">
+          <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
             Create project
           </button>
         </form>
@@ -116,7 +123,7 @@ export default function ProjectsPage() {
         </div>
         {joinError && <p className="error-text">{joinError}</p>}
         {joinMessage && <p className="success-text">{joinMessage}</p>}
-        <button type="submit" className="btn btn-primary">
+        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
           Join project
         </button>
       </form>

@@ -28,3 +28,5 @@ backend/.venv
 backend/__pycache__
 backend/**/__pycache__
 backend/data/users.txt
+backend/data/projects.json
+backend/data/hardware.json

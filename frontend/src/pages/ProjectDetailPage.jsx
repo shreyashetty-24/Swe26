@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
-  const { currentUser, projects, hardwareSets, checkOutHardware, checkInHardware } = useApp();
+  const navigate = useNavigate();
+  const { currentUser, projects, hardwareSets, checkOutHardware, checkInHardware, leaveProject } = useApp();
 
   const project = projects.find((p) => p.id === id);
 
   const [hardwareId, setHardwareId] = useState(hardwareSets[0]?.id ?? '');
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState('');
+  const [leaveError, setLeaveError] = useState('');
 
   if (!project) {
     return (
@@ -42,17 +44,31 @@ export default function ProjectDetailPage() {
     return hardwareSets.find((h) => h.id === hwId)?.name ?? 'Unknown hardware';
   }
 
-  function handleCheckout(e) {
+  async function handleCheckout(e) {
     e.preventDefault();
     setError('');
 
-    const result = checkOutHardware(project.id, hardwareId, Number(quantity));
+    const result = await checkOutHardware(project.id, hardwareId, Number(quantity));
     if (!result.ok) {
       setError(result.error);
       return;
     }
 
     setQuantity(1);
+  }
+
+  async function handleCheckIn(checkoutId) {
+    await checkInHardware(project.id, checkoutId);
+  }
+
+  async function handleLeave() {
+    setLeaveError('');
+    const result = await leaveProject(project.id);
+    if (!result.ok) {
+      setLeaveError(result.error);
+      return;
+    }
+    navigate('/projects');
   }
 
   return (
@@ -72,6 +88,11 @@ export default function ProjectDetailPage() {
       <p className="project-card-meta">
         {project.memberIds.length} member{project.memberIds.length === 1 ? '' : 's'}
       </p>
+
+      {leaveError && <p className="error-text">{leaveError}</p>}
+      <button type="button" className="btn btn-secondary btn-small" onClick={handleLeave}>
+        Leave project
+      </button>
 
       <section className="card">
         <h2>Hardware checked out by {project.name}</h2>
@@ -97,7 +118,7 @@ export default function ProjectDetailPage() {
                     <button
                       type="button"
                       className="btn btn-secondary btn-small"
-                      onClick={() => checkInHardware(project.id, c.id)}
+                      onClick={() => handleCheckIn(c.id)}
                     >
                       Check in
                     </button>
