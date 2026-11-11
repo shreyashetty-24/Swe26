@@ -1,6 +1,11 @@
 import { Link } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
+import RoleBadge from './RoleBadge';
 
 export default function ProjectCard({ project }) {
+  const { isLeader } = useApp();
+  const unitsOut = project.checkouts.reduce((sum, c) => sum + c.quantity, 0);
+
   return (
     <div className="card project-card">
       <div className="project-card-header">
@@ -13,8 +18,9 @@ export default function ProjectCard({ project }) {
         {project.startDate} &rarr; {project.endDate}
       </p>
       <p className="project-card-meta">
-        {project.memberIds.length} member{project.memberIds.length === 1 ? '' : 's'} &middot;{' '}
-        {project.checkouts.length} checkout{project.checkouts.length === 1 ? '' : 's'}
+        <RoleBadge isLeader={isLeader(project)} /> &middot; {project.memberIds.length} member
+        {project.memberIds.length === 1 ? '' : 's'} &middot; {unitsOut} unit
+        {unitsOut === 1 ? '' : 's'} checked out
       </p>
       <div className="project-card-actions">
         <Link to={`/projects/${project.id}`} className="btn btn-secondary">

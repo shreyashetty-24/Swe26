@@ -1,8 +1,14 @@
+import { useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import HardwareRow from '../components/HardwareRow';
 
 export default function InventoryPage() {
-  const { hardwareSets } = useApp();
+  const { hardwareSets, refreshHardware } = useApp();
+
+  // Other projects change the shared pool too, so re-fetch when this page opens.
+  useEffect(() => {
+    refreshHardware();
+  }, [refreshHardware]);
 
   return (
     <div className="page">
@@ -10,8 +16,8 @@ export default function InventoryPage() {
         <h1>Hardware Inventory</h1>
       </div>
       <p className="subtitle">
-        Hardware capacity is global and shared by every project. Availability updates live as
-        projects check hardware in and out.
+        Hardware capacity is global and shared by every project. Availability reflects what every
+        project has checked out right now.
       </p>
 
       <div className="card">
