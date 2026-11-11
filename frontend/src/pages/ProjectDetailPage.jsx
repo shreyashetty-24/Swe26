@@ -1,74 +1,39 @@
-import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import CheckoutForm from '../components/CheckoutForm';
+import CheckoutTable from '../components/CheckoutTable';
+import LeaveProjectSection from '../components/LeaveProjectSection';
+import RoleBadge from '../components/RoleBadge';
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { currentUser, projects, hardwareSets, checkOutHardware, checkInHardware, leaveProject } = useApp();
+  const { currentUser, getProject, isLeader, isLoading } = useApp();
 
-  const project = projects.find((p) => p.id === id);
+  const project = getProject(id);
 
-  const [hardwareId, setHardwareId] = useState(hardwareSets[0]?.id ?? '');
-  const [quantity, setQuantity] = useState(1);
-  const [error, setError] = useState('');
-  const [leaveError, setLeaveError] = useState('');
-
-  if (!project) {
+  if (isLoading) {
     return (
       <div className="page">
-        <p className="empty-state">Project not found.</p>
-        <Link to="/projects" className="btn btn-secondary">
-          Back to projects
-        </Link>
+        <p className="empty-state">Loading…</p>
       </div>
     );
   }
 
-  const isMember = project.memberIds.includes(currentUser.id);
-
-  if (!isMember) {
+  // Only projects the user belongs to are loaded, so "not found" also covers
+  // projects that exist but that this user hasn't joined.
+  if (!project || !project.memberIds.includes(currentUser.id)) {
     return (
       <div className="page">
         <p className="empty-state">
-          You're not a member of this project. Join it from the Projects page using its project ID.
+          Project not found, or you're not a member. Join a project from the Projects page using
+          its project ID.
         </p>
         <Link to="/projects" className="btn btn-secondary">
           Back to projects
         </Link>
       </div>
     );
-  }
-
-  function hardwareName(hwId) {
-    return hardwareSets.find((h) => h.id === hwId)?.name ?? 'Unknown hardware';
-  }
-
-  async function handleCheckout(e) {
-    e.preventDefault();
-    setError('');
-
-    const result = await checkOutHardware(project.id, hardwareId, Number(quantity));
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-
-    setQuantity(1);
-  }
-
-  async function handleCheckIn(checkoutId) {
-    await checkInHardware(project.id, checkoutId);
-  }
-
-  async function handleLeave() {
-    setLeaveError('');
-    const result = await leaveProject(project.id);
-    if (!result.ok) {
-      setLeaveError(result.error);
-      return;
-    }
-    navigate('/projects');
   }
 
   return (
@@ -79,7 +44,10 @@ export default function ProjectDetailPage() {
 
       <div className="page-header">
         <h1>{project.name}</h1>
-        <span className="badge badge-member">{project.id}</span>
+        <div className="page-header-actions">
+          <RoleBadge isLeader={isLeader(project)} />
+          <span className="badge badge-member">{project.id}</span>
+        </div>
       </div>
 
       <p className="project-card-dates">
@@ -89,75 +57,9 @@ export default function ProjectDetailPage() {
         {project.memberIds.length} member{project.memberIds.length === 1 ? '' : 's'}
       </p>
 
-      {leaveError && <p className="error-text">{leaveError}</p>}
-      <button type="button" className="btn btn-secondary btn-small" onClick={handleLeave}>
-        Leave project
-      </button>
-
-      <section className="card">
-        <h2>Hardware checked out by {project.name}</h2>
-        {project.checkouts.length === 0 ? (
-          <p className="empty-state">No hardware checked out yet.</p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Hardware set</th>
-                <th>Qty</th>
-                <th>When</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {project.checkouts.map((c) => (
-                <tr key={c.id}>
-                  <td>{hardwareName(c.hardwareId)}</td>
-                  <td>{c.quantity}</td>
-                  <td>{new Date(c.checkedOutAt).toLocaleString()}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-small"
-                      onClick={() => handleCheckIn(c.id)}
-                    >
-                      Check in
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
-
-      <section className="card">
-          <h2>Check out hardware</h2>
-          <form className="checkout-form" onSubmit={handleCheckout}>
-            <label className="field">
-              <span>Hardware set</span>
-              <select value={hardwareId} onChange={(e) => setHardwareId(e.target.value)}>
-                {hardwareSets.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.name} ({h.available} available)
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field field-quantity">
-              <span>Quantity</span>
-              <input
-                type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-              />
-            </label>
-            <button type="submit" className="btn btn-primary">
-              Check out
-            </button>
-          </form>
-          {error && <p className="error-text">{error}</p>}
-      </section>
+      <CheckoutTable project={project} />
+      <CheckoutForm project={project} />
+      <LeaveProjectSection project={project} onLeft={() => navigate('/projects')} />
     </div>
   );
 }

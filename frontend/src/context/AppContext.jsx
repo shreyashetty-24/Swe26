@@ -1,40 +1,57 @@
-import { createContext, useContext, useEffect, useReducer } from 'react';
+import { createContext, useCallback, useContext, useEffect, useReducer } from 'react';
 import { loginRequest, signupRequest } from '../api/authApi';
+import { fetchHardware } from '../api/hardwareApi';
 import {
-  checkInHardwareRequest,
-  checkOutHardwareRequest,
+  checkInRequest,
+  checkOutRequest,
   createProjectRequest,
-  fetchHardware,
   fetchProjects,
   joinProjectRequest,
   leaveProjectRequest,
-} from '../api/appApi';
+} from '../api/projectsApi';
 
 const AppContext = createContext(null);
 
+// Projects and hardware now live in MongoDB (via the backend); this state is
+// just a cache of what the server last told us for the logged-in user.
 const initialState = {
   currentUser: null,
   projects: [],
   hardwareSets: [],
+  isLoading: false,
+  loadError: '',
 };
+
+function upsertProject(projects, project) {
+  const exists = projects.some((p) => p.id === project.id);
+  return exists ? projects.map((p) => (p.id === project.id ? project : p)) : [...projects, project];
+}
 
 function reducer(state, action) {
   switch (action.type) {
-    case 'LOGIN': {
-      return { ...state, currentUser: action.user };
-    }
+    case 'LOGIN':
+      return { ...initialState, currentUser: action.user, isLoading: true };
 
-    case 'LOGOUT': {
-      return { ...state, currentUser: null };
-    }
+    case 'LOGOUT':
+      return initialState;
 
-    case 'SET_PROJECTS': {
-      return { ...state, projects: action.projects };
-    }
+    case 'DATA_LOADED':
+      return {
+        ...state,
+        isLoading: false,
+        loadError: action.error,
+        projects: action.projects,
+        hardwareSets: action.hardwareSets,
+      };
 
-    case 'SET_HARDWARE': {
+    case 'PROJECT_SAVED':
+      return { ...state, projects: upsertProject(state.projects, action.project) };
+
+    case 'PROJECT_REMOVED':
+      return { ...state, projects: state.projects.filter((p) => p.id !== action.projectId) };
+
+    case 'HARDWARE_SET':
       return { ...state, hardwareSets: action.hardwareSets };
-    }
 
     default:
       return state;
@@ -43,129 +60,120 @@ function reducer(state, action) {
 
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const userId = state.currentUser?.id;
 
-  async function refreshProjects() {
-    const result = await fetchProjects();
-    if (result.ok) {
-      dispatch({ type: 'SET_PROJECTS', projects: result.projects });
-    }
-  }
-
-  async function refreshHardware() {
-    const result = await fetchHardware();
-    if (result.ok) {
-      dispatch({ type: 'SET_HARDWARE', hardwareSets: result.hardwareSets });
-    }
-  }
-
-  // Projects & hardware sets now live on the backend (simple local JSON
-  // files -- see backend/project_store.py and backend/hardware_store.py)
-  // instead of in-memory mock data, so load them once up front.
+  // Load this user's projects and the global hardware pool after login.
   useEffect(() => {
-    refreshProjects();
-    refreshHardware();
-  }, []);
+    if (!userId) return undefined;
+    let cancelled = false;
 
-  // Signup/login both call the very basic backend API (see ../../backend)
-  // instead of keeping credentials in memory. The backend persists users
-  // to a local encrypted text file.
-  async function signup(username, password) {
+    Promise.all([fetchProjects(userId), fetchHardware(userId)]).then(([p, h]) => {
+      if (cancelled) return;
+      dispatch({
+        type: 'DATA_LOADED',
+        projects: p.ok ? p.projects : [],
+        hardwareSets: h.ok ? h.hardwareSets : [],
+        error: p.ok && h.ok ? '' : p.error || h.error,
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  // ---- auth --------------------------------------------------------------
+
+  async function authenticate(requestFn, username, password) {
     if (!username.trim() || !password.trim()) {
       return { ok: false, error: 'Username and password are required.' };
     }
-    const result = await signupRequest(username, password);
-    if (!result.ok) {
-      return result;
-    }
+    const result = await requestFn(username, password);
+    if (!result.ok) return result;
     dispatch({ type: 'LOGIN', user: result.user });
     return { ok: true };
   }
 
-  async function login(username, password) {
-    if (!username.trim() || !password.trim()) {
-      return { ok: false, error: 'Username and password are required.' };
-    }
-    const result = await loginRequest(username, password);
-    if (!result.ok) {
-      return result;
-    }
-    dispatch({ type: 'LOGIN', user: result.user });
-    return { ok: true };
-  }
+  const signup = (username, password) => authenticate(signupRequest, username, password);
+  const login = (username, password) => authenticate(loginRequest, username, password);
 
   function logout() {
     dispatch({ type: 'LOGOUT' });
   }
 
-  async function createProject(name, startDate, endDate) {
-    if (!name.trim() || !startDate || !endDate) {
-      return { ok: false, error: 'Name, start date, and end date are all required.' };
-    }
-    if (endDate < startDate) {
-      return { ok: false, error: 'End date cannot be before the start date.' };
-    }
-    const result = await createProjectRequest(name, startDate, endDate, state.currentUser.id);
-    if (!result.ok) {
-      return result;
-    }
-    await refreshProjects();
-    return { ok: true, project: result.project };
+  // ---- projects ----------------------------------------------------------
+
+  // Project ids are chosen by the user; the server validates and enforces
+  // uniqueness (case-insensitive).
+  async function createProject({ id, name, startDate, endDate }) {
+    const result = await createProjectRequest(userId, { id, name, startDate, endDate });
+    if (result.ok) dispatch({ type: 'PROJECT_SAVED', project: result.project });
+    return result;
   }
 
-  // Projects can only be joined by entering the exact project ID (no browse-and-join button).
+  // Projects can only be joined by entering the exact project ID.
   async function joinProject(rawId) {
-    const projectId = rawId.trim().toUpperCase();
-    if (!projectId) {
-      return { ok: false, error: 'Please enter a project ID.' };
-    }
-    const result = await joinProjectRequest(projectId, state.currentUser.id);
-    if (!result.ok) {
-      return result;
-    }
-    await refreshProjects();
-    return { ok: true, project: result.project };
+    if (!rawId.trim()) return { ok: false, error: 'Please enter a project ID.' };
+    const result = await joinProjectRequest(userId, rawId.trim());
+    if (result.ok) dispatch({ type: 'PROJECT_SAVED', project: result.project });
+    return result;
   }
 
+  // Members can leave; the server refuses if you're the project's leader.
   async function leaveProject(projectId) {
-    const result = await leaveProjectRequest(projectId, state.currentUser.id);
-    if (!result.ok) {
-      return result;
-    }
-    await refreshProjects();
-    return { ok: true, project: result.project };
+    const result = await leaveProjectRequest(userId, projectId);
+    if (result.ok) dispatch({ type: 'PROJECT_REMOVED', projectId });
+    return result;
   }
 
-  async function checkOutHardware(projectId, hardwareId, quantity) {
-    if (!quantity || quantity <= 0) {
-      return { ok: false, error: 'Quantity must be at least 1.' };
-    }
-    const result = await checkOutHardwareRequest(projectId, hardwareId, quantity);
-    if (!result.ok) {
-      return result;
-    }
-    await Promise.all([refreshProjects(), refreshHardware()]);
-    return { ok: true };
+  function getProject(id) {
+    const wanted = (id ?? '').toLowerCase();
+    return state.projects.find((p) => p.id.toLowerCase() === wanted);
   }
 
-  async function checkInHardware(projectId, checkoutId) {
-    const result = await checkInHardwareRequest(projectId, checkoutId);
-    if (!result.ok) {
-      return result;
-    }
-    await Promise.all([refreshProjects(), refreshHardware()]);
-    return { ok: true };
+  function isLeader(project) {
+    return project.leaderId === userId;
   }
+
+  // ---- hardware ----------------------------------------------------------
+
+  const refreshHardware = useCallback(async () => {
+    if (!userId) return;
+    const result = await fetchHardware(userId);
+    if (result.ok) dispatch({ type: 'HARDWARE_SET', hardwareSets: result.hardwareSets });
+  }, [userId]);
+
+  async function applyHardwareChange(requestFn, projectId, hardwareId, quantity) {
+    const result = await requestFn(userId, projectId, hardwareId, quantity);
+    if (result.ok) {
+      dispatch({ type: 'PROJECT_SAVED', project: result.project });
+      dispatch({ type: 'HARDWARE_SET', hardwareSets: result.hardwareSets });
+    }
+    return result;
+  }
+
+  const checkOutHardware = (projectId, hardwareId, quantity) =>
+    applyHardwareChange(checkOutRequest, projectId, hardwareId, quantity);
+
+  // Check in any amount up to what the project currently holds.
+  const checkInHardware = (projectId, hardwareId, quantity) =>
+    applyHardwareChange(checkInRequest, projectId, hardwareId, quantity);
 
   const value = {
     currentUser: state.currentUser,
     projects: state.projects,
     hardwareSets: state.hardwareSets,
+    isLoading: state.isLoading,
+    loadError: state.loadError,
     signup,
     login,
     logout,
+    getProject,
+    isLeader,
     createProject,
     joinProject,
     leaveProject,
+    refreshHardware,
     checkOutHardware,
     checkInHardware,
   };
