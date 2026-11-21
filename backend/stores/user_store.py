@@ -1,4 +1,4 @@
-# Accounts, stored in the `haas_users` database.
+# Accounts, stored in the `Users` database.
 #
 # Credentials are still obscured with the course cipher (cipher.py) before
 # they are written, same as the old text-file store. The cipher is

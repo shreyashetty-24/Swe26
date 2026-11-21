@@ -27,6 +27,7 @@ export default function ProjectsPage() {
 
       {loadError && <p className="error-text">{loadError}</p>}
 
+      <h2 className="projects-list-heading">Your Projects</h2>
       {isLoading ? (
         <p className="empty-state">Loading your projects…</p>
       ) : projects.length === 0 ? (

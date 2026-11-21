@@ -1,0 +1,13 @@
+# Optional: a local MongoDB for dev when you don't want to use Atlas.
+# Run with: docker compose up -d
+# Then leave MONGO_URI unset (defaults to mongodb://localhost:27017).
+services:
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:

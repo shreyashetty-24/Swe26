@@ -4,6 +4,7 @@ import CheckoutForm from '../components/CheckoutForm';
 import CheckoutTable from '../components/CheckoutTable';
 import LeaveProjectSection from '../components/LeaveProjectSection';
 import RoleBadge from '../components/RoleBadge';
+import { formatDate } from '../utils/dates';
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
@@ -50,8 +51,9 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
+      {project.description && <p className="project-card-description">{project.description}</p>}
       <p className="project-card-dates">
-        Time window: {project.startDate} &rarr; {project.endDate}
+        Time window: {formatDate(project.startDate)} &rarr; {formatDate(project.endDate)}
       </p>
       <p className="project-card-meta">
         {project.memberIds.length} member{project.memberIds.length === 1 ? '' : 's'}

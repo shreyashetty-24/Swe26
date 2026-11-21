@@ -7,7 +7,10 @@ from app import create_app
 
 
 def mk_project(api, uid, pid="Robotics-2026"):
-    r = api.post("/projects", uid, id=pid, name="Robotics", startDate="2026-10-01", endDate="2026-10-05")
+    r = api.post(
+        "/projects", uid, id=pid, name="Robotics", description="Build a robot arm",
+        startDate="2026-10-01", endDate="2026-10-05",
+    )
     assert r.status_code == 201, r.get_json()
     return r.get_json()["project"]
 
@@ -55,14 +58,14 @@ def test_custom_project_id_is_kept_as_typed(api):
 def test_project_ids_unique_case_insensitively(api):
     ann, bob = api.signup("ann"), api.signup("bob")
     mk_project(api, ann, "Robotics-2026")
-    r = api.post("/projects", bob, id="ROBOTICS-2026", name="x", startDate="2026-10-01", endDate="2026-10-02")
+    r = api.post("/projects", bob, id="ROBOTICS-2026", name="x", description="x", startDate="2026-10-01", endDate="2026-10-02")
     assert r.status_code == 409
 
 
 def test_invalid_project_ids_rejected(api):
     uid = api.signup("ann")
     for bad in ["", "ab", "has space", "bad/slash", "-lead", "x" * 33, "emoji😀id"]:
-        r = api.post("/projects", uid, id=bad, name="x", startDate="2026-10-01", endDate="2026-10-02")
+        r = api.post("/projects", uid, id=bad, name="x", description="x", startDate="2026-10-01", endDate="2026-10-02")
         assert r.status_code == 400, bad
 
 
@@ -78,7 +81,34 @@ def test_join_by_custom_id_any_case(api):
 
 def test_end_before_start_rejected(api):
     uid = api.signup("ann")
-    r = api.post("/projects", uid, id="abc", name="x", startDate="2026-10-05", endDate="2026-10-01")
+    r = api.post("/projects", uid, id="abc", name="x", description="x", startDate="2026-10-05", endDate="2026-10-01")
+    assert r.status_code == 400
+
+
+# ---- project description ---------------------------------------------------
+
+def test_description_is_required_stored_and_returned(api):
+    uid = api.signup("ann")
+    assert mk_project(api, uid)["description"] == "Build a robot arm"
+    stored = db.projects().find_one({"_id": "robotics-2026"})
+    assert stored["Description"] == "Build a robot arm"
+    listed = api.get("/projects", uid).get_json()["projects"][0]
+    assert listed["description"] == "Build a robot arm"
+
+
+def test_missing_or_blank_description_rejected(api):
+    uid = api.signup("ann")
+    base = dict(id="abc", name="x", startDate="2026-10-01", endDate="2026-10-02")
+    assert api.post("/projects", uid, **base).status_code == 400
+    assert api.post("/projects", uid, description="   ", **base).status_code == 400
+
+
+def test_overlong_description_rejected(api):
+    uid = api.signup("ann")
+    r = api.post(
+        "/projects", uid, id="abc", name="x", description="x" * 501,
+        startDate="2026-10-01", endDate="2026-10-02",
+    )
     assert r.status_code == 400
 
 

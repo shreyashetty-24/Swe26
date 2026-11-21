@@ -1,5 +1,5 @@
-# Flask API backing HaaS: auth, projects (with leader/member roles) and
-# hardware checkout. Data lives in three MongoDB databases -- see db.py.
+# Flask API for Project Hardware Checkout: auth, projects (with leader/member
+# roles) and hardware checkout. Data lives in three MongoDB databases -- see db.py.
 
 import sys
 
@@ -40,7 +40,8 @@ if __name__ == "__main__":
         application = create_app()
     except PyMongoError as exc:
         sys.exit(
-            "Could not connect to MongoDB. Is it running, and is MONGO_URI correct?\n"
+            "Could not connect to MongoDB. Check MONGO_URI in backend/.env (username, "
+            "URL-encoded password), and that your IP is allowed under Atlas -> Network Access.\n"
             f"({exc.__class__.__name__}: {exc})"
         )
     application.run(debug=True, port=5000)

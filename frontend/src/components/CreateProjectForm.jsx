@@ -6,6 +6,7 @@ export default function CreateProjectForm({ onCreated }) {
 
   const [id, setId] = useState('');
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [error, setError] = useState('');
@@ -15,7 +16,7 @@ export default function CreateProjectForm({ onCreated }) {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
-    const result = await createProject({ id, name, startDate, endDate });
+    const result = await createProject({ id, name, description, startDate, endDate });
     setIsSubmitting(false);
 
     if (!result.ok) {
@@ -53,6 +54,18 @@ export default function CreateProjectForm({ onCreated }) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Robotics Capstone"
+          required
+        />
+      </label>
+
+      <label className="field">
+        <span>Description</span>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="e.g. Build a robot arm for the spring showcase"
+          rows={3}
+          maxLength={500}
           required
         />
       </label>

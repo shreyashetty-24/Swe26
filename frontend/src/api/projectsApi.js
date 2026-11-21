@@ -9,8 +9,8 @@ export function fetchProjects(userId) {
   return request('GET', `/api/projects?userId=${enc(userId)}`);
 }
 
-export function createProjectRequest(userId, { id, name, startDate, endDate }) {
-  return request('POST', '/api/projects', { userId, id, name, startDate, endDate });
+export function createProjectRequest(userId, { id, name, description, startDate, endDate }) {
+  return request('POST', '/api/projects', { userId, id, name, description, startDate, endDate });
 }
 
 export function joinProjectRequest(userId, id) {

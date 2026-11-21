@@ -14,7 +14,7 @@ export default function NavBar() {
 
   return (
     <header className="navbar">
-      <div className="navbar-brand">HaaS</div>
+      <div className="navbar-brand">Project Hardware Checkout</div>
       <nav className="navbar-links">
         <NavLink to="/projects" className={({ isActive }) => (isActive ? 'active' : '')}>
           Projects

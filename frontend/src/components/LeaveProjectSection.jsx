@@ -37,10 +37,12 @@ export default function LeaveProjectSection({ project, onLeft }) {
   return (
     <section className="card">
       <h2>Membership</h2>
-      <p className="hint-text">Hardware your project has checked out stays with the project.</p>
-      <button type="button" className="btn btn-secondary" onClick={handleLeave} disabled={isSubmitting}>
-        Leave project
-      </button>
+      <div className="leave-project-row">
+        <p className="hint-text">Hardware your project has checked out stays with the project.</p>
+        <button type="button" className="btn btn-secondary" onClick={handleLeave} disabled={isSubmitting}>
+          Leave project
+        </button>
+      </div>
       {error && <p className="error-text">{error}</p>}
     </section>
   );

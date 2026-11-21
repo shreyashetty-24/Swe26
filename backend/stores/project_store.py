@@ -1,12 +1,13 @@
-# Projects and membership, stored in the `haas_projects` database.
+# Projects and membership, stored in the `Projects` database.
 #
 # Every project has exactly one *leader* (whoever created it) plus any
 # number of ordinary members. `memberIds` lists everyone, leader included.
 # The leader can never leave their own project.
 #
 # Project ids are chosen by the user. `_id` holds the lower-cased id so ids
-# are unique case-insensitively (MongoDB enforces that for us); `projectId`
-# keeps the capitalisation the user typed for display.
+# are unique case-insensitively (MongoDB enforces that for us); `ID` keeps
+# the capitalisation the user typed for display. `ID`, `Name` and
+# `Description` are named like the HW6 Projects.Project1 document.
 
 import re
 from datetime import date, datetime, timezone
@@ -21,10 +22,21 @@ PROJECT_ID_RULES = (
     "Project ID must be 3-32 characters: letters, numbers, hyphens or "
     "underscores, starting with a letter or number."
 )
+MAX_DESCRIPTION_LENGTH = 500
 
 
 def _key(project_id):
     return (project_id or "").strip().lower()
+
+
+def _iso_utc(dt):
+    # PyMongo returns naive UTC datetimes by default. Tag them as UTC so the
+    # frontend's Date()/toLocaleString() convert into the viewer's time zone
+    # instead of treating the UTC wall clock as already-local (which shows up
+    # as e.g. a 6-hour offset in Central Time).
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
 
 
 def _checkouts_by_project(project_ids):
@@ -34,7 +46,7 @@ def _checkouts_by_project(project_ids):
             {
                 "hardwareId": c["hardwareId"],
                 "quantity": c["quantity"],
-                "updatedAt": c["updatedAt"].isoformat(),
+                "updatedAt": _iso_utc(c["updatedAt"]),
             }
         )
     return by_project
@@ -44,8 +56,10 @@ def serialize_many(docs):
     checkouts = _checkouts_by_project([d["_id"] for d in docs])
     return [
         {
-            "id": d["projectId"],
-            "name": d["name"],
+            "id": d["ID"],
+            "name": d["Name"],
+            # .get(): projects saved before Description existed have none.
+            "description": d.get("Description", ""),
             "startDate": d["startDate"],
             "endDate": d["endDate"],
             "leaderId": d["leaderId"],
@@ -79,16 +93,21 @@ def list_for_user(user_id):
     return serialize_many(list(docs))
 
 
-def create_project(user_id, project_id, name, start_date, end_date):
+def create_project(user_id, project_id, name, description, start_date, end_date):
     project_id = (project_id or "").strip()
     name = (name or "").strip()
+    description = (description or "").strip()
 
     if not project_id:
         raise StoreError("Please choose a project ID.", 400)
     if not PROJECT_ID_PATTERN.match(project_id):
         raise StoreError(PROJECT_ID_RULES, 400)
-    if not name or not start_date or not end_date:
-        raise StoreError("Name, start date, and end date are all required.", 400)
+    if not name or not description or not start_date or not end_date:
+        raise StoreError("Name, description, start date, and end date are all required.", 400)
+    if len(description) > MAX_DESCRIPTION_LENGTH:
+        raise StoreError(
+            f"Description can be at most {MAX_DESCRIPTION_LENGTH} characters.", 400
+        )
     try:
         start, end = date.fromisoformat(start_date), date.fromisoformat(end_date)
     except (TypeError, ValueError):
@@ -98,8 +117,9 @@ def create_project(user_id, project_id, name, start_date, end_date):
 
     doc = {
         "_id": _key(project_id),
-        "projectId": project_id,
-        "name": name,
+        "ID": project_id,
+        "Name": name,
+        "Description": description,
         "startDate": start_date,
         "endDate": end_date,
         "leaderId": user_id,
@@ -124,7 +144,7 @@ def join_project(user_id, project_id):
     )
     doc = get_doc(project_id)  # 404 if it doesn't exist
     if result.modified_count == 0:
-        raise StoreError(f"You are already a member of {doc['name']}.", 409)
+        raise StoreError(f"You are already a member of {doc['Name']}.", 409)
     return serialize(doc)
 
 

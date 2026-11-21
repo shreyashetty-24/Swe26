@@ -1,5 +1,5 @@
 # Simple Caesar-style cipher used to obscure credentials before they are
-# written to the local "database" file (see user_store.py).
+# written to MongoDB (see user_store.py). The app uses N = 3, D = 1.
 #
 # Adapted from the course HW2 cipher.py. The original encrypt() had a bug:
 # its character-validity check only allowed ' ' and '!', which meant it

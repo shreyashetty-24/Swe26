@@ -1,13 +1,15 @@
 # MongoDB connection + the three databases the backend is made of:
 #
-#   haas_users     -> users                (accounts)
-#   haas_projects  -> projects, checkouts  (projects, membership, what each
+#   Users          -> users                (accounts)
+#   Projects       -> projects, checkouts  (projects, membership, what each
 #                                           project currently has checked out)
-#   haas_hardware  -> hardware_sets        (global capacity / availability)
+#   HardwareSet    -> hardware_sets        (global capacity / availability)
 #
 # Databases only reference each other by plain ids (e.g. a project stores
 # its members' user ids), never by joins, so each one could be moved to its
 # own server via the *_MONGO_URI settings in config.py.
+
+from datetime import timezone
 
 from pymongo import ASCENDING, MongoClient
 
@@ -21,7 +23,12 @@ def _client_for(uri):
     if _injected_client is not None:
         return _injected_client
     if uri not in _clients:
-        _clients[uri] = MongoClient(uri, serverSelectionTimeoutMS=5000)
+        _clients[uri] = MongoClient(
+            uri,
+            serverSelectionTimeoutMS=15000,
+            tz_aware=True,
+            tzinfo=timezone.utc,
+        )
     return _clients[uri]
 
 

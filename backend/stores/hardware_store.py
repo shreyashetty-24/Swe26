@@ -1,4 +1,4 @@
-# Global hardware capacity, stored in the `haas_hardware` database.
+# Global hardware capacity, stored in the `HardwareSet` database.
 #
 # reserve()/release() are single atomic MongoDB updates, so two projects
 # racing for the last unit can never both get it.

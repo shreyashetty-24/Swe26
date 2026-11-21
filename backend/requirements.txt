@@ -1,3 +1,5 @@
 Flask==3.0.3
 Flask-Cors==4.0.1
 pymongo==4.10.1
+dnspython>=2.6,<3  # needed for mongodb+srv:// (Atlas) URIs; same as HW6's "pymongo[srv]"
+python-dotenv==1.0.1

@@ -105,8 +105,8 @@ export function AppProvider({ children }) {
 
   // Project ids are chosen by the user; the server validates and enforces
   // uniqueness (case-insensitive).
-  async function createProject({ id, name, startDate, endDate }) {
-    const result = await createProjectRequest(userId, { id, name, startDate, endDate });
+  async function createProject({ id, name, description, startDate, endDate }) {
+    const result = await createProjectRequest(userId, { id, name, description, startDate, endDate });
     if (result.ok) dispatch({ type: 'PROJECT_SAVED', project: result.project });
     return result;
   }

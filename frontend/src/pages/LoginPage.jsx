@@ -42,8 +42,8 @@ export default function LoginPage() {
   return (
     <div className="auth-page">
       <div className="card auth-card">
-        <h1>HaaS</h1>
-        <p className="subtitle">Hardware-as-a-Service for student projects</p>
+        <h1>Project Hardware Checkout</h1>
+        <p className="subtitle">Reserve lab hardware for your student projects</p>
 
         <h2>{mode === 'login' ? 'Log in' : 'Create an account'}</h2>
 

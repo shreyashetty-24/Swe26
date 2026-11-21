@@ -1,8 +1,8 @@
 # Checking hardware out of / back into the global pool on behalf of a
 # project. This is the one place that touches two databases at once:
 #
-#   haas_hardware  -> hardware_sets : global `available` count
-#   haas_projects  -> checkouts     : units each project currently holds
+#   HardwareSet    -> hardware_sets : global `available` count
+#   Projects       -> checkouts     : units each project currently holds
 #
 # MongoDB can't run a transaction across separate databases/servers, so
 # each step is a single atomic, guarded update and a failed second step

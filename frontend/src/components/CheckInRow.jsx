@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { formatDateTime } from '../utils/dates';
 
 // One row of the "checked out" table. The member picks how many units to
-// return -- anything from 1 up to what the project currently holds.
+// return -- anything from 1 up to what the project currently holds. The
+// quantity input and the Check in button live in separate columns so the
+// button can sit right-aligned without crowding the number.
 export default function CheckInRow({ projectId, checkout, hardwareName }) {
   const { checkInHardware } = useApp();
 
@@ -39,9 +42,9 @@ export default function CheckInRow({ projectId, checkout, hardwareName }) {
     <tr>
       <td>{hardwareName}</td>
       <td>{checkout.quantity}</td>
-      <td>{new Date(checkout.updatedAt).toLocaleString()}</td>
+      <td>{formatDateTime(checkout.updatedAt)}</td>
       <td>
-        <form className="checkin-form" onSubmit={handleSubmit}>
+        <form id={`checkin-${checkout.hardwareId}`} className="checkin-form" onSubmit={handleSubmit}>
           <input
             type="number"
             min="1"
@@ -58,11 +61,18 @@ export default function CheckInRow({ projectId, checkout, hardwareName }) {
           >
             All
           </button>
-          <button type="submit" className="btn btn-secondary btn-small" disabled={isSubmitting}>
-            Check in
-          </button>
         </form>
         {error && <p className="error-text checkin-error">{error}</p>}
+      </td>
+      <td className="checkin-action">
+        <button
+          type="submit"
+          form={`checkin-${checkout.hardwareId}`}
+          className="btn btn-secondary btn-small"
+          disabled={isSubmitting}
+        >
+          Check in
+        </button>
       </td>
     </tr>
   );

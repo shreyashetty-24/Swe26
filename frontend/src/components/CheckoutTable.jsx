@@ -20,7 +20,8 @@ export default function CheckoutTable({ project }) {
               <th>Hardware set</th>
               <th>Qty out</th>
               <th>Last activity</th>
-              <th>Check in</th>
+              <th>Qty to return</th>
+              <th className="checkin-action">Check in</th>
             </tr>
           </thead>
           <tbody>

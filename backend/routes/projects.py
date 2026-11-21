@@ -30,6 +30,7 @@ def create_project():
         user_id,
         data.get("id"),
         data.get("name"),
+        data.get("description"),
         data.get("startDate"),
         data.get("endDate"),
     )
