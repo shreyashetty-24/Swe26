@@ -1,9 +1,10 @@
 # Flask API for Project Hardware Checkout: auth, projects (with leader/member
 # roles) and hardware checkout. Data lives in three MongoDB databases -- see db.py.
 
+import os
 import sys
 
-from flask import Flask, jsonify
+from flask import Flask, abort, jsonify, send_from_directory
 from flask_cors import CORS
 from pymongo.errors import PyMongoError
 
@@ -11,10 +12,12 @@ import db
 from routes import auth, hardware, projects
 from routes.helpers import register_error_handler
 
+DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+
 
 def create_app(mongo_client=None):
     """`mongo_client` lets tests run against an in-memory MongoDB."""
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder=None)
     CORS(app)  # Allow the Vite dev server (different port) to call this API.
 
     db.init(mongo_client)
@@ -31,6 +34,16 @@ def create_app(mongo_client=None):
         except PyMongoError:
             return jsonify(status="degraded", error="MongoDB is unreachable."), 503
         return jsonify(status="ok")
+
+    # Serve the built React app (production / Heroku).
+    @app.get("/", defaults={"path": ""})
+    @app.get("/<path:path>")
+    def spa(path):
+        if path.startswith("api/"):
+            abort(404)
+        if path and os.path.isfile(os.path.join(DIST, path)):
+            return send_from_directory(DIST, path)
+        return send_from_directory(DIST, "index.html")  # React Router fallback
 
     return app
 
